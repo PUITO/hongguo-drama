@@ -131,7 +131,7 @@ public class MainActivity extends Activity {
         switch (code) {
             case "api_level": return "需要 Android API 21（Android 5.0）及以上。当前电视系统版本过低。";
             case "webview_init": return "系统 WebView 无法初始化。请到设置中启用「Android System WebView」或「Chrome」，更新系统 WebView 后重试。若仍失败请反馈下方 Init error。";
-            case "js_bigint": return "WebView 缺少 BigInt，现有取源签名无法运行。";
+            case "js_bigint": return "系统 WebView 过旧，缺少 BigInt（需 Chrome 67+）。请更新 Android System WebView 或安装新版 Chrome 后重试。";
             case "js_abort": return "WebView 缺少 AbortController／AbortSignal.timeout，无法安全取消请求。";
             case "js_collections": return "WebView 缺少现有程序需要的集合或字符串 API。";
             case "js_dom": return "WebView 缺少页面更新或遥控焦点需要的 DOM API。";
