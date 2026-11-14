@@ -18,7 +18,7 @@ decrypt = decrypt.replace('const total = data.length;', `const total = data.leng
   for (let p = 0; p < total;) {
     if (p + 8 > total) throw new Error('视频容器不完整');
     let size = data.readUInt32BE(p);
-    if (size === 1) { if (p + 16 > total) throw new Error('视频容器不完整'); size = Number(data.readBigUInt64BE(p + 8)); }
+    if (size === 1) { if (p + 16 > total) throw new Error('视频容器不完整'); size = data.readUInt32BE(p + 8) * 0x100000000 + data.readUInt32BE(p + 12); }
     if (size === 0) size = total - p;
     if (!Number.isSafeInteger(size) || size < 8 || p + size > total) throw new Error('视频容器长度无效');
     p += size;
@@ -35,13 +35,28 @@ decrypt = decrypt.replace('if (off + sz > total) continue;', "if (off < 0 || off
 const out = path.join(root, 'build'); fs.mkdirSync(out, {recursive:true});
 const generated = path.join(out, 'decrypt.js');
 fs.writeFileSync(generated, `import * as crypto from '../web/crypto.js';\n${decrypt}\nexport { decryptMp4Buffer, decryptSample };\n`);
+const tvNativePlugin = {
+  name: 'tv-native-sign',
+  setup(build) {
+    if (!tv) return;
+    build.onResolve({ filter: /playback-signature(\.(js|cjs))?$/ }, () => ({ path: path.join(root, 'web/playback-signature-native.cjs') }));
+    build.onResolve({ filter: /(^|\/)sm3(\.(js|cjs))?$/ }, () => ({ path: path.join(root, 'web/sm3-native.cjs') }));
+    build.onResolve({ filter: /app-source(\.(js|cjs))?$/ }, () => ({ path: path.join(root, 'web/app-source-native.cjs') }));
+  }
+};
 esbuild.buildSync({
-  ...(tv ? { stdin: { contents: "import './web/tv.js'; import { connectTvDanmaku } from './web/tv-danmaku.js'; connectTvDanmaku();", resolveDir: root, sourcefile: 'tv-entry.js' } }
+  plugins: tv ? [tvNativePlugin] : [],
+  ...(tv ? { stdin: { contents: "import './web/tv.js'; /* danmaku disabled on low-WebView TV (needs BigInt sign) */", resolveDir: root, sourcefile: 'tv-entry.js' } }
     : { entryPoints: [path.join(root, 'web/app.js')] }),
   outfile: path.join(root,tv ? 'build/tv/assets/app.js' : 'app/src/main/assets/app.js'),
   bundle: true, format:'iife', platform:'browser', target:'chrome100', minify:true,
   inject:[path.join(root,'web/globals.js')],
   alias: {'android-decrypt':path.join(root,'build/decrypt.js'), 'node:crypto':path.join(root,'web/crypto.js'), 'node:zlib':path.join(root,'web/zlib.js'), 'node:timers/promises':path.join(root,'web/timers.cjs'), 'axios':path.join(root,'web/axios.cjs'),
-    ...(tv ? {'node:fs':path.join(root,'mobile/fs.cjs'), 'node:path':path.join(root,'mobile/path.cjs')} : {})},
+    ...(tv ? {
+      'node:fs':path.join(root,'mobile/fs.cjs'),
+      'node:path':path.join(root,'mobile/path.cjs'),
+      [path.join(root,'../src/native/playback-signature.js')]: path.join(root,'web/playback-signature-native.cjs'),
+      [path.join(root,'../src/native/sm3.js')]: path.join(root,'web/sm3-native.cjs'),
+    } : {})},
   legalComments:'eof',
 });

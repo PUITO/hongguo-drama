@@ -170,9 +170,13 @@
   }
 
   try {
-    /* BigInt is required for request signing; cannot be fully polyfilled without rewriting crypto. */
-    if (typeof BigInt !== 'function') { fail('js_bigint'); return; }
-    if (typeof BigInt.asUintN !== 'function') { fail('js_bigint'); return; }
+    /* Prefer native Java signer when WebView lacks BigInt. */
+    var hasNativeSign = window.Native && typeof Native.nativeSignAvailable === 'function' && Native.nativeSignAvailable();
+    if (!hasNativeSign) {
+      if (typeof BigInt !== 'function') { fail('js_bigint'); return; }
+      if (typeof BigInt.asUintN !== 'function') { fail('js_bigint'); return; }
+    }
+    window.__HG_NATIVE_SIGN__ = !!hasNativeSign;
 
     if (typeof AbortController !== 'function') { fail('js_abort'); return; }
     if (typeof AbortSignal === 'undefined') { fail('js_abort'); return; }

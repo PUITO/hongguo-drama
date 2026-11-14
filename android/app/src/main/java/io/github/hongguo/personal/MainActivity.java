@@ -685,6 +685,24 @@ public class MainActivity extends Activity {
             if (!algorithm.equals("md5") && !algorithm.equals("sha512") && !algorithm.equals("sha256")) throw new IllegalArgumentException();
             return Base64.encodeToString(MessageDigest.getInstance(algorithm).digest(Base64.decode(data,Base64.DEFAULT)),Base64.NO_WRAP);
         }
+
+        @JavascriptInterface public boolean nativeSignAvailable() {
+            return !closed && AppSigner.available();
+        }
+
+        /** TV path: sign playback request without WebView BigInt. bodyB64 may be empty. */
+        @JavascriptInterface public String signPlayer(String query, String bodyB64, String ts) {
+            if (closed) return "";
+            try {
+                byte[] body = (bodyB64 == null || bodyB64.isEmpty()) ? null : android.util.Base64.decode(bodyB64, android.util.Base64.DEFAULT);
+                long t = Long.parseLong(ts);
+                return AppSigner.signPlayer(query, body, t);
+            } catch (Exception e) {
+                android.util.Log.e("HongguoTv", "signPlayer", e);
+                return "";
+            }
+        }
+
         @JavascriptInterface public String crypt(boolean decrypt, String algorithm, String key, String iv, boolean padding, String data) throws Exception {
             requireBusinessOpen();
             if (!algorithm.equals("aes-128-cbc") && !algorithm.equals("aes-128-ecb") && !algorithm.equals("aes-128-ctr")) throw new IllegalArgumentException();
