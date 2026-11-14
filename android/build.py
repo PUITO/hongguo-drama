@@ -67,9 +67,12 @@ def main():
         (assets/'style.css').write_text((assets/'style.css').read_text() + '\n' + (ROOT/'tv.css').read_text())
         xml = (ROOT/'app/src/main/AndroidManifest.xml').read_text()
         xml = xml.replace('package="io.github.hongguo.personal"',f'package="{package_name}"').replace('android:versionCode="2"',f'android:versionCode="{version_code}"').replace('android:versionName="1.1"',f'android:versionName="{version}"')
-        xml = xml.replace('<application ', '<uses-feature android:name="android.software.leanback" android:required="true" /><uses-feature android:name="android.hardware.touchscreen" android:required="false" /><application android:banner="@drawable/tv_banner" ')
+        xml = xml.replace('<application ', '<uses-feature android:name="android.software.leanback" android:required="false" /><uses-feature android:name="android.hardware.touchscreen" android:required="false" /><application android:banner="@drawable/tv_banner" ')
         xml = xml.replace('android:label="红果·自用"','android:label="红果短剧 TV"').replace('android:name=".MainActivity"','android:name="io.github.hongguo.personal.MainActivity" android:screenOrientation="landscape"')
-        xml = xml.replace('android.intent.category.LAUNCHER','android.intent.category.LEANBACK_LAUNCHER')
+        xml = xml.replace(
+            '<category android:name="android.intent.category.LAUNCHER" />',
+            '<category android:name="android.intent.category.LAUNCHER" />\n                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />'
+        )
         xml = xml.replace('<application ', '<queries><intent><action android:name="android.intent.action.VIEW" /><data android:mimeType="video/mp4" /></intent></queries><application ')
         manifest.write_text(xml)
         (resources/'drawable/tv_banner.xml').write_text('<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item android:width="320dp" android:height="180dp"><shape><solid android:color="#171b25" /></shape></item><item android:width="120dp" android:height="120dp" android:gravity="center" android:drawable="@drawable/icon" /></layer-list>')
