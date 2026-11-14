@@ -50,7 +50,7 @@ await esbuild.build({
   ...(tv ? { stdin: { contents: "import './web/tv.js'; /* danmaku disabled on low-WebView TV (needs BigInt sign) */", resolveDir: root, sourcefile: 'tv-entry.js' } }
     : { entryPoints: [path.join(root, 'web/app.js')] }),
   outfile: path.join(root,tv ? 'build/tv/assets/app.js' : 'app/src/main/assets/app.js'),
-  bundle: true, format:'iife', platform:'browser', target:'chrome100', minify:true,
+  bundle: true, format:'iife', platform:'browser', target: tv ? 'chrome67' : 'chrome100', minify:true,
   inject:[path.join(root,'web/globals.js')],
   alias: {'android-decrypt':path.join(root,'build/decrypt.js'), 'node:crypto':path.join(root,'web/crypto.js'), 'node:zlib':path.join(root,'web/zlib.js'), 'node:timers/promises':path.join(root,'web/timers.cjs'), 'axios':path.join(root,'web/axios.cjs'),
     ...(tv ? {

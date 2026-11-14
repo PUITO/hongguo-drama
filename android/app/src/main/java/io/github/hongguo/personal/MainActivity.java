@@ -142,7 +142,7 @@ public class MainActivity extends Activity {
             case "bundle_error": return "界面脚本加载或执行失败。请更新系统 WebView 后重新打开。";
             case "page_error": return "本地启动页面无法加载。请重新安装完整候选包。";
             case "renderer_gone": return "系统 WebView 页面进程已退出。请重新打开应用。";
-            case "startup_timeout": return "启动预检超过12秒，未收到界面就绪回执。请检查系统 WebView 后重新打开。";
+            case "startup_timeout": return "启动预检超过45秒仍未就绪。请反馈屏幕上其它能力信息；可尝试清除应用数据后重开。";
             default: return null;
         }
     }
@@ -305,7 +305,7 @@ public class MainActivity extends Activity {
                 }
             });
             root.addView(web, new FrameLayout.LayoutParams(-1,-1));
-            if (isTv()) root.postDelayed(tvStartupTimeout, 12000);
+            if (isTv()) root.postDelayed(tvStartupTimeout, 45000);
             web.loadUrl(ORIGIN + "/index.html");
         } catch (RuntimeException | LinkageError error) {
             if (!isTv()) throw error;

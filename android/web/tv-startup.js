@@ -227,16 +227,36 @@
     }
 
     var script = document.createElement('script');
-    var bundleFailed = function () { fail('bundle_error'); };
+    var bundleFailed = function (ev) {
+      try {
+        if (window.Native && typeof Native.tvStartup === 'function') {
+          /* keep code short for Java side */
+        }
+        var msg = (ev && ev.message) ? String(ev.message) : '';
+        if (msg && document.querySelector('#content') && !finished) {
+          document.querySelector('#content').textContent = '脚本异常: ' + msg.slice(0, 120);
+        }
+      } catch (e) {}
+      fail('bundle_error');
+    };
     window.addEventListener('error', bundleFailed);
+    window.addEventListener('unhandledrejection', function () { bundleFailed(); });
     script.src = 'app.js';
-    script.onerror = bundleFailed;
+    script.async = false;
+    script.onerror = function () { bundleFailed({ message: 'app.js 加载失败' }); };
     script.onload = function () {
       window.removeEventListener('error', bundleFailed);
       if (finished) return;
-      if (typeof window.tvKey !== 'function' || typeof window.appBack !== 'function') { fail('bundle_error'); return; }
-      finished = true;
-      report('ready');
+      /* Give slow TVs a short settle after parse/execute */
+      setTimeout(function () {
+        if (finished) return;
+        if (typeof window.tvKey !== 'function' || typeof window.appBack !== 'function') {
+          fail('bundle_error');
+          return;
+        }
+        finished = true;
+        report('ready');
+      }, 50);
     };
     document.head.appendChild(script);
   } catch (ignored) { fail('bundle_error'); }
