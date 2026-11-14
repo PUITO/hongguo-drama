@@ -56,8 +56,6 @@ await esbuild.build({
     ...(tv ? {
       'node:fs':path.join(root,'mobile/fs.cjs'),
       'node:path':path.join(root,'mobile/path.cjs'),
-      [path.join(root,'../src/native/playback-signature.js')]: path.join(root,'web/playback-signature-native.cjs'),
-      [path.join(root,'../src/native/sm3.js')]: path.join(root,'web/sm3-native.cjs'),
     } : {})},
   legalComments:'eof',
 });
