@@ -68,7 +68,7 @@ def main():
         xml = (ROOT/'app/src/main/AndroidManifest.xml').read_text()
         xml = xml.replace('package="io.github.hongguo.personal"',f'package="{package_name}"').replace('android:versionCode="2"',f'android:versionCode="{version_code}"').replace('android:versionName="1.1"',f'android:versionName="{version}"')
         xml = xml.replace('<application ', '<uses-feature android:name="android.software.leanback" android:required="false" /><uses-feature android:name="android.hardware.touchscreen" android:required="false" /><application android:banner="@drawable/tv_banner" ')
-        xml = xml.replace('android:label="红果·自用"','android:label="红果短剧 TV"').replace('android:name=".MainActivity"','android:name="io.github.hongguo.personal.MainActivity" android:screenOrientation="landscape"')
+        xml = xml.replace('android:label="红果·自用"','android:label="红果短剧 TV" android:largeHeap="true" android:hardwareAccelerated="true"').replace('android:name=".MainActivity"','android:name="io.github.hongguo.personal.MainActivity" android:screenOrientation="landscape" android:hardwareAccelerated="true"')
         xml = xml.replace(
             '<category android:name="android.intent.category.LAUNCHER" />',
             '<category android:name="android.intent.category.LAUNCHER" />\n                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />'

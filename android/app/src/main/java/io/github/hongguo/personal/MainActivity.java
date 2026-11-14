@@ -93,11 +93,17 @@ public class MainActivity extends Activity {
         tvDiagnostics = "Android API " + android.os.Build.VERSION.SDK_INT + " · ABI " + abis;
         android.util.Log.i("HongguoTv", "HG:tv:api:" + android.os.Build.VERSION.SDK_INT);
         android.util.Log.i("HongguoTv", "HG:tv:abis:" + abis);
-        android.content.pm.PackageInfo provider = WebView.getCurrentWebViewPackage();
-        String version = provider == null ? "unavailable" : provider.versionName;
-        if (version == null || (!"unavailable".equals(version) && !version.matches("[0-9.]{1,60}"))) version = "unknown";
-        tvDiagnostics += "\nWebView " + version;
-        android.util.Log.i("HongguoTv", "HG:tv:webview:" + version);
+        try {
+            android.content.pm.PackageInfo provider = WebView.getCurrentWebViewPackage();
+            String version = provider == null ? "unavailable" : provider.versionName;
+            String pkg = provider == null ? "none" : provider.packageName;
+            if (version == null || (!"unavailable".equals(version) && !version.matches("[0-9.]{1,60}"))) version = "unknown";
+            tvDiagnostics += "\nWebView " + version + " (" + pkg + ")";
+            android.util.Log.i("HongguoTv", "HG:tv:webview:" + version + ":" + pkg);
+        } catch (Throwable t) {
+            tvDiagnostics += "\nWebView query failed: " + t.getClass().getSimpleName();
+            android.util.Log.w("HongguoTv", "HG:tv:webview:query_fail", t);
+        }
         int[] keys = {KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
             KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_REWIND};
@@ -124,7 +130,7 @@ public class MainActivity extends Activity {
     private static String tvFailureReason(String code) {
         switch (code) {
             case "api_level": return "需要 Android API 21（Android 5.0）及以上。当前电视系统版本过低。";
-            case "webview_init": return "系统 WebView 无法初始化。请启用或更新系统 WebView。";
+            case "webview_init": return "系统 WebView 无法初始化。请到设置中启用「Android System WebView」或「Chrome」，更新系统 WebView 后重试。若仍失败请反馈下方 Init error。";
             case "js_bigint": return "WebView 缺少 BigInt，现有取源签名无法运行。";
             case "js_abort": return "WebView 缺少 AbortController／AbortSignal.timeout，无法安全取消请求。";
             case "js_collections": return "WebView 缺少现有程序需要的集合或字符串 API。";
@@ -183,6 +189,52 @@ public class MainActivity extends Activity {
         }
     }
 
+
+    /** Try multiple strategies to create a usable WebView on broken TV firmwares. */
+    private WebView createWebViewResilient() {
+        // Avoid multi-process data dir conflicts on API 28+
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            try { WebView.setDataDirectorySuffix("hongguo_tv"); } catch (Throwable ignored) {}
+        }
+        RuntimeException last = null;
+        // Strategy 1: Activity context (normal)
+        try {
+            WebView w = new WebView(this);
+            android.util.Log.i("HongguoTv", "HG:tv:webview:create:activity_ok");
+            return w;
+        } catch (RuntimeException | LinkageError e) {
+            last = e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
+            android.util.Log.w("HongguoTv", "HG:tv:webview:create:activity_fail", e);
+        }
+        // Strategy 2: Application context
+        try {
+            WebView w = new WebView(getApplicationContext());
+            android.util.Log.i("HongguoTv", "HG:tv:webview:create:app_ok");
+            return w;
+        } catch (RuntimeException | LinkageError e) {
+            last = e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
+            android.util.Log.w("HongguoTv", "HG:tv:webview:create:app_fail", e);
+        }
+        // Strategy 3: Force software rendering path by creating then immediately switching layer
+        // (some vendors crash only when hardware layer is used later; still try once more)
+        try {
+            WebView w = new WebView(this);
+            w.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            android.util.Log.i("HongguoTv", "HG:tv:webview:create:software_ok");
+            return w;
+        } catch (RuntimeException | LinkageError e) {
+            last = e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
+            android.util.Log.w("HongguoTv", "HG:tv:webview:create:software_fail", e);
+        }
+        if (last != null) {
+            String msg = last.getClass().getSimpleName() + ": " + String.valueOf(last.getMessage());
+            if (msg.length() > 180) msg = msg.substring(0, 180);
+            tvDiagnostics += "\nInit error: " + msg.replaceAll("[\\r\\n]+", " ");
+            throw last;
+        }
+        throw new RuntimeException("WebView create failed");
+    }
+
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -199,7 +251,7 @@ public class MainActivity extends Activity {
         if (isTv() && android.os.Build.VERSION.SDK_INT < 21) { failTvStartup("api_level"); return; }
         try {
             if (isTv()) collectTvDiagnostics();
-            web = new WebView(this);
+            web = isTv() ? createWebViewResilient() : new WebView(this);
             web.setBackgroundColor(Color.rgb(23,27,37));
             WebSettings settings = web.getSettings();
             settings.setJavaScriptEnabled(true);
@@ -211,6 +263,10 @@ public class MainActivity extends Activity {
             settings.setSupportMultipleWindows(false);
             if (android.os.Build.VERSION.SDK_INT >= 26) {
                 settings.setSafeBrowsingEnabled(true);
+            }
+            // Old TV WebView often crashes with hardware layers; prefer software on API < 24
+            if (isTv() && android.os.Build.VERSION.SDK_INT < 24) {
+                web.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             }
             web.addJavascriptInterface(new Bridge(), "Native");
             web.setWebViewClient(new WebViewClient() {
@@ -253,6 +309,13 @@ public class MainActivity extends Activity {
             web.loadUrl(ORIGIN + "/index.html");
         } catch (RuntimeException | LinkageError error) {
             if (!isTv()) throw error;
+            String detail = error.getClass().getSimpleName();
+            if (error.getMessage() != null) detail += ": " + error.getMessage();
+            detail = detail.replaceAll("[\\r\\n]+", " ");
+            if (detail.length() > 200) detail = detail.substring(0, 200);
+            if (tvDiagnostics == null) tvDiagnostics = "";
+            if (!tvDiagnostics.contains("Init error:")) tvDiagnostics += "\nInit error: " + detail;
+            android.util.Log.e("HongguoTv", "HG:tv:webview_init", error);
             failTvStartup("webview_init");
         }
     }
