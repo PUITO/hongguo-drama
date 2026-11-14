@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+async function main() {
 const path = require('node:path');
 const esbuild = require('../node_modules/esbuild');
 const root = __dirname;
@@ -44,7 +45,7 @@ const tvNativePlugin = {
     build.onResolve({ filter: /app-source(\.(js|cjs))?$/ }, () => ({ path: path.join(root, 'web/app-source-native.cjs') }));
   }
 };
-esbuild.buildSync({
+await esbuild.build({
   plugins: tv ? [tvNativePlugin] : [],
   ...(tv ? { stdin: { contents: "import './web/tv.js'; /* danmaku disabled on low-WebView TV (needs BigInt sign) */", resolveDir: root, sourcefile: 'tv-entry.js' } }
     : { entryPoints: [path.join(root, 'web/app.js')] }),
@@ -60,3 +61,5 @@ esbuild.buildSync({
     } : {})},
   legalComments:'eof',
 });
+}
+main().catch(e => { console.error(e); process.exit(1); });
