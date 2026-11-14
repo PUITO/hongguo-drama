@@ -90,7 +90,7 @@ def main():
     sources = list((ROOT/'app/src/main/java').rglob('*.java'))
     boot = str(platform) + os.pathsep + str(tools/'core-lambda-stubs.jar')
     run([java/'bin/javac','-encoding','UTF-8','-g:none','-source','8','-target','8','-bootclasspath',boot,'-d',classes,*sources],env)
-    run([tools/'d8','--min-api','29','--lib',platform,'--output',dex,*classes.rglob('*.class')],env)
+    run([tools/'d8','--min-api','21','--lib',platform,'--output',dex,*classes.rglob('*.class')],env)
     with zipfile.ZipFile(unsigned,'a',compression=zipfile.ZIP_DEFLATED) as apk:
         for file in dex.glob('*.dex'): apk.write(file,file.name)
     aligned = BUILD/'aligned.apk'
@@ -107,12 +107,12 @@ def main():
     signature = run([tools/'apksigner','verify','--verbose','--print-certs',output],env)
     package = run([tools/'aapt','dump','badging',output],env)
     expected = f"package: name='{package_name}' versionCode='{version_code}' versionName='{version}'"
-    if expected not in package or "sdkVersion:'29'" not in package or "targetSdkVersion:'34'" not in package:
+    if expected not in package or "sdkVersion:'21'" not in package or "targetSdkVersion:'34'" not in package:
         raise SystemExit('APK包信息不符合预期')
     checksum = hashlib.sha256(output.read_bytes()).hexdigest()
     if tv and ("leanback-launchable-activity:" not in package or "uses-feature-not-required: name='android.hardware.touchscreen'" not in package):
         raise SystemExit('TV入口或无触屏声明缺失')
-    (BUILD/'verification.json').write_text(json.dumps({'file':output.name,'sha256':checksum,'bytes':output.stat().st_size,'package':package_name,'version':version,'minSdk':29,'targetSdk':34,'signature_verified':True,'device_tested':False,'source_version':desktop_version,'candidate':tv,**({'tv_version':tv_version,'version_code':version_code} if tv else {})},ensure_ascii=False,indent=2)+'\n')
+    (BUILD/'verification.json').write_text(json.dumps({'file':output.name,'sha256':checksum,'bytes':output.stat().st_size,'package':package_name,'version':version,'minSdk':21,'targetSdk':34,'signature_verified':True,'device_tested':False,'source_version':desktop_version,'candidate':tv,**({'tv_version':tv_version,'version_code':version_code} if tv else {})},ensure_ascii=False,indent=2)+'\n')
     (BUILD/'signature.txt').write_text(signature)
     print(f'APK构建与签名校验通过：{output.name} ({output.stat().st_size} bytes)')
     print(f'SHA256 {checksum}')

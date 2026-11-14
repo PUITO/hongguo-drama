@@ -1,0 +1,110 @@
+name: Android TV APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-tv.yml'
+    branches: [main]
+  pull_request:
+    paths:
+      - 'android/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-tv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            android/package-lock.json
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
+
+      - name: Accept licenses & prepare tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          # Prefer build-tools 34; fall back if 36 not available
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/build-tools" || true
+          ls "$ANDROID_HOME/platforms" || true
+
+      - name: Install root & android npm deps
+        run: |
+          npm ci --ignore-scripts || npm install --ignore-scripts
+          npm --prefix android ci --ignore-scripts
+
+      - name: Patch build.py for available SDK (CI)
+        run: |
+          # Detect available build-tools and platform
+          BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
+          PLAT=$(ls "$ANDROID_HOME/platforms" | sort -V | tail -1)
+          echo "Using build-tools=$BT platform=$PLAT"
+          # Override hardcoded paths in build.py for CI
+          sed -i "s|build-tools' / '36.0.0'|build-tools' / '$BT'|" android/build.py
+          sed -i "s|platforms/android-36/android.jar|platforms/$PLAT/android.jar|" android/build.py
+          # Also relax JAVA path; use JAVA_HOME from setup-java
+          sed -i "s|/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home|$JAVA_HOME|" android/build.py
+          sed -i "s|/opt/homebrew/share/android-commandlinetools|$ANDROID_HOME|" android/build.py
+          # Ensure d8 --min-api is already 21 from our change
+          grep -n "min-api\|build-tools\|platforms" android/build.py | head -10
+
+      - name: Build TV APK
+        run: |
+          export ANDROID_HOME JAVA_HOME
+          python3 android/build.py --tv
+          ls -la android/build/tv/
+          cat android/build/tv/verification.json || true
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hongguo-tv-apk
+          path: |
+            android/build/tv/*.apk
+            android/build/tv/verification.json
+            android/build/tv/signature.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release (on main dispatch or tag)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tv-${{ github.run_number }}
+          name: Android TV APK (build ${{ github.run_number }})
+          body: |
+            自动构建的 Android TV 安装包（minSdk 21）。
+            - 包名：`io.github.hongguo.tv`
+            - 兼容 Android 5.0+（API 21+）
+            - **新签名**，无法覆盖官方 6.6/7.2 开发包，请先卸载旧版再安装。
+            - 未做真机测试。老电视（如 TCL 入门机）请自行验证 WebView 能力。
+          files: |
+            android/build/tv/*.apk
+            android/build/tv/verification.json
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

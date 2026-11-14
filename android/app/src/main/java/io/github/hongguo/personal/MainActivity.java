@@ -123,7 +123,7 @@ public class MainActivity extends Activity {
 
     private static String tvFailureReason(String code) {
         switch (code) {
-            case "api_level": return "需要 Android API 29（Android 10）及以上。";
+            case "api_level": return "需要 Android API 21（Android 5.0）及以上。当前电视系统版本过低。";
             case "webview_init": return "系统 WebView 无法初始化。请启用或更新系统 WebView。";
             case "js_bigint": return "WebView 缺少 BigInt，现有取源签名无法运行。";
             case "js_abort": return "WebView 缺少 AbortController／AbortSignal.timeout，无法安全取消请求。";
@@ -196,7 +196,7 @@ public class MainActivity extends Activity {
         if (saved != null) for (File f : saved) if (f.getName().matches("[0-9a-f-]{36}\\.mp4")) media.put(f.getName(), f);
         root = new FrameLayout(this);
         setContentView(root);
-        if (isTv() && android.os.Build.VERSION.SDK_INT < 29) { failTvStartup("api_level"); return; }
+        if (isTv() && android.os.Build.VERSION.SDK_INT < 21) { failTvStartup("api_level"); return; }
         try {
             if (isTv()) collectTvDiagnostics();
             web = new WebView(this);
@@ -209,7 +209,9 @@ public class MainActivity extends Activity {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
             settings.setMediaPlaybackRequiresUserGesture(false);
             settings.setSupportMultipleWindows(false);
-            settings.setSafeBrowsingEnabled(true);
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                settings.setSafeBrowsingEnabled(true);
+            }
             web.addJavascriptInterface(new Bridge(), "Native");
             web.setWebViewClient(new WebViewClient() {
                 @Override public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError error) {
